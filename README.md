@@ -1,9 +1,8 @@
 # golang-fiber-jwt-auth
 
 Go Fiber REST API with hand-rolled JWT auth (no JWT library). Postgres for
-users, Redis for refresh-token revocation. Personal reference project -
-hexagonal architecture (`handler/service/repository`), built to look back at
-later.
+users, Redis for refresh-token revocation. Hexagonal architecture
+(`handler/service/repository`).
 
 ## Run
 
