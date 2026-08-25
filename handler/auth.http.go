@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strconv"
+
 	"golang-fiber-jwt-auth/errs"
 	"golang-fiber-jwt-auth/service"
 	"golang-fiber-jwt-auth/token"
@@ -27,7 +29,7 @@ func (h authHandler) Register(c *fiber.Ctx) error {
 		return handleError(c, err)
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(resp)
+	return sendSuccess(c, fiber.StatusCreated, "user registered successfully", resp)
 }
 
 func (h authHandler) Login(c *fiber.Ctx) error {
@@ -41,7 +43,7 @@ func (h authHandler) Login(c *fiber.Ctx) error {
 		return handleError(c, err)
 	}
 
-	return c.Status(fiber.StatusOK).JSON(resp)
+	return sendSuccess(c, fiber.StatusOK, "login successful", resp)
 }
 
 func (h authHandler) Refresh(c *fiber.Ctx) error {
@@ -55,7 +57,7 @@ func (h authHandler) Refresh(c *fiber.Ctx) error {
 		return handleError(c, err)
 	}
 
-	return c.Status(fiber.StatusOK).JSON(resp)
+	return sendSuccess(c, fiber.StatusOK, "token refreshed successfully", resp)
 }
 
 func (h authHandler) Logout(c *fiber.Ctx) error {
@@ -68,11 +70,11 @@ func (h authHandler) Logout(c *fiber.Ctx) error {
 		return handleError(c, err)
 	}
 
-	return c.SendStatus(fiber.StatusNoContent)
+	return sendSuccess(c, fiber.StatusOK, "logged out successfully", nil)
 }
 
 type meResponse struct {
-	ID   string `json:"id"`
+	ID   int64  `json:"id"`
 	Role string `json:"role"`
 }
 
@@ -82,5 +84,10 @@ func (h authHandler) Me(c *fiber.Ctx) error {
 		return handleError(c, errs.NewUnauthorizedError("missing auth context"))
 	}
 
-	return c.Status(fiber.StatusOK).JSON(meResponse{ID: claims.Sub, Role: claims.Role})
+	id, err := strconv.ParseInt(claims.Sub, 10, 64)
+	if err != nil {
+		return handleError(c, errs.NewUnexpectedError())
+	}
+
+	return sendSuccess(c, fiber.StatusOK, "user profile retrieved successfully", meResponse{ID: id, Role: claims.Role})
 }

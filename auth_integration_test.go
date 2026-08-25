@@ -159,15 +159,17 @@ func TestAuthFlow_RevokedRefreshTokenIsRejected(t *testing.T) {
 		t.Fatalf("login status = %d, want %d", resp.StatusCode, fiber.StatusOK)
 	}
 
-	var loginResp service.LoginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+	var loginEnvelope struct {
+		Data service.LoginResponse `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&loginEnvelope); err != nil {
 		t.Fatalf("decode login response: %v", err)
 	}
-	if loginResp.RefreshToken == "" {
+	if loginEnvelope.Data.RefreshToken == "" {
 		t.Fatal("login response has an empty refresh token")
 	}
 
-	refreshRequest := map[string]string{"refresh_token": loginResp.RefreshToken}
+	refreshRequest := map[string]string{"refresh_token": loginEnvelope.Data.RefreshToken}
 
 	resp = doJSON(t, app, fiber.MethodPost, "/auth/refresh", refreshRequest)
 	if resp.StatusCode != fiber.StatusOK {
@@ -175,8 +177,8 @@ func TestAuthFlow_RevokedRefreshTokenIsRejected(t *testing.T) {
 	}
 
 	resp = doJSON(t, app, fiber.MethodPost, "/auth/logout", refreshRequest)
-	if resp.StatusCode != fiber.StatusNoContent {
-		t.Fatalf("logout status = %d, want %d", resp.StatusCode, fiber.StatusNoContent)
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("logout status = %d, want %d", resp.StatusCode, fiber.StatusOK)
 	}
 
 	resp = doJSON(t, app, fiber.MethodPost, "/auth/refresh", refreshRequest)

@@ -21,6 +21,15 @@ POST /auth/logout      {"refresh_token"}
 GET  /me               Authorization: Bearer <access_token>
 ```
 
+Every response, success or error, uses the same envelope:
+
+```json
+{ "code": 200, "message": "login successful", "data": { "...": "..." } }
+```
+
+`code` mirrors the HTTP status. `data` is `null` when there is nothing to
+return (e.g. logout).
+
 ## Design notes
 
 - JWT is hand-rolled (`token/` package, `crypto/hmac`), not a library. `alg`
