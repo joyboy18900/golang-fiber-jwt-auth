@@ -16,7 +16,7 @@ type User struct {
 
 var ErrUserNotFound = errors.New("repository: user not found")
 
-//go:generate mockgen -destination=../mock/mock_repository/user.go golang-fiber-jwt-auth/repository UserRepository
+//go:generate go tool mockgen -destination=../mock/mock_repository/user.go golang-fiber-jwt-auth/repository UserRepository
 type UserRepository interface {
 	Create(ctx context.Context, user User) (*User, error)
 	FindByEmail(ctx context.Context, email string) (*User, error)
