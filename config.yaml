@@ -1,0 +1,21 @@
+app:
+  port: 8080
+
+db:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  name: golang_fiber_jwt_auth
+  sslmode: disable
+
+redis:
+  addr: localhost:6379
+  password: ""
+  db: 0
+
+jwt:
+  access_secret: change-me-access-secret
+  refresh_secret: change-me-refresh-secret
+  access_ttl_minutes: 15
+  refresh_ttl_hours: 168
