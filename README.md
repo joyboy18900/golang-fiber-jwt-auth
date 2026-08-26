@@ -48,3 +48,5 @@ GET  /me               Authorization: Bearer <access_token>
 go test ./...
 go generate ./...   # regenerate repository mocks
 ```
+
+See `curl/flow.md` for a manual walkthrough of every endpoint.
