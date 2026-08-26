@@ -35,7 +35,6 @@ type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-//go:generate go tool mockgen -destination=../mock/mock_service/auth.go golang-fiber-jwt-auth/service AuthService
 type AuthService interface {
 	Register(ctx context.Context, req RegisterRequest) (*RegisterResponse, error)
 	Login(ctx context.Context, req LoginRequest) (*LoginResponse, error)
