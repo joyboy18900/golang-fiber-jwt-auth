@@ -1,21 +1,26 @@
 package token
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func TestGenerateVerifyRoundTrip(t *testing.T) {
 	secret := []byte("test-secret")
 	claims := Claims{
-		Sub:  "42",
 		Role: "user",
 		Typ:  "access",
-		Iat:  time.Now().Unix(),
-		Exp:  time.Now().Add(time.Minute).Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "42",
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
 	}
 
 	tok, err := Generate(secret, claims)
@@ -28,14 +33,21 @@ func TestGenerateVerifyRoundTrip(t *testing.T) {
 		t.Fatalf("Verify() error = %v", err)
 	}
 
-	if got.Sub != claims.Sub || got.Role != claims.Role || got.Typ != claims.Typ {
+	if got.Subject != claims.Subject || got.Role != claims.Role || got.Typ != claims.Typ {
 		t.Fatalf("Verify() claims = %+v, want %+v", got, claims)
 	}
 }
 
 func TestVerifyRejectsTamperedPayload(t *testing.T) {
 	secret := []byte("test-secret")
-	claims := Claims{Sub: "42", Role: "user", Typ: "access", Exp: time.Now().Add(time.Minute).Unix()}
+	claims := Claims{
+		Role: "user",
+		Typ:  "access",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "42",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
+	}
 
 	tok, err := Generate(secret, claims)
 	if err != nil {
@@ -51,33 +63,55 @@ func TestVerifyRejectsTamperedPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode payload: %v", err)
 	}
+	idx := bytes.IndexAny(payload, "0123456789")
+	if idx == -1 {
+		t.Fatal("payload has no digit to tamper with")
+	}
 	tamperedPayload := append([]byte{}, payload...)
-	tamperedPayload[0] ^= 0xFF
+	if tamperedPayload[idx] == '9' {
+		tamperedPayload[idx] = '8'
+	} else {
+		tamperedPayload[idx]++
+	}
 	parts[1] = base64.RawURLEncoding.EncodeToString(tamperedPayload)
 	tampered := strings.Join(parts, ".")
 
-	if _, err := Verify(secret, tampered, "access"); !errors.Is(err, ErrInvalidSignature) {
-		t.Fatalf("Verify() error = %v, want ErrInvalidSignature", err)
+	if _, err := Verify(secret, tampered, "access"); !errors.Is(err, jwt.ErrTokenSignatureInvalid) {
+		t.Fatalf("Verify() error = %v, want jwt.ErrTokenSignatureInvalid", err)
 	}
 }
 
 func TestVerifyRejectsExpiredToken(t *testing.T) {
 	secret := []byte("test-secret")
-	claims := Claims{Sub: "42", Role: "user", Typ: "access", Exp: time.Now().Add(-time.Minute).Unix()}
+	claims := Claims{
+		Role: "user",
+		Typ:  "access",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "42",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-time.Minute)),
+		},
+	}
 
 	tok, err := Generate(secret, claims)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
 
-	if _, err := Verify(secret, tok, "access"); !errors.Is(err, ErrExpired) {
-		t.Fatalf("Verify() error = %v, want ErrExpired", err)
+	if _, err := Verify(secret, tok, "access"); !errors.Is(err, jwt.ErrTokenExpired) {
+		t.Fatalf("Verify() error = %v, want jwt.ErrTokenExpired", err)
 	}
 }
 
 func TestVerifyRejectsWrongType(t *testing.T) {
 	secret := []byte("test-secret")
-	claims := Claims{Sub: "42", Role: "user", Typ: "access", Exp: time.Now().Add(time.Minute).Unix()}
+	claims := Claims{
+		Role: "user",
+		Typ:  "access",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "42",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
+	}
 
 	tok, err := Generate(secret, claims)
 	if err != nil {
@@ -91,38 +125,49 @@ func TestVerifyRejectsWrongType(t *testing.T) {
 
 func TestVerifyRejectsUnsupportedAlg(t *testing.T) {
 	secret := []byte("test-secret")
-
-	header, err := encodeSegment(Header{Alg: "none", Typ: "JWT"})
-	if err != nil {
-		t.Fatalf("encodeSegment(header) error = %v", err)
+	claims := Claims{
+		Role: "user",
+		Typ:  "access",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "42",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
 	}
-	payload, err := encodeSegment(Claims{Sub: "42", Typ: "access", Exp: time.Now().Add(time.Minute).Unix()})
-	if err != nil {
-		t.Fatalf("encodeSegment(payload) error = %v", err)
-	}
-	forged := header + "." + payload + "."
 
-	if _, err := Verify(secret, forged, "access"); !errors.Is(err, ErrInvalidAlg) {
-		t.Fatalf("Verify() error = %v, want ErrInvalidAlg", err)
+	tok := jwt.NewWithClaims(jwt.SigningMethodNone, claims)
+	forged, err := tok.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	if err != nil {
+		t.Fatalf("SignedString(none) error = %v", err)
+	}
+
+	if _, err := Verify(secret, forged, "access"); err == nil {
+		t.Fatal("Verify() error = nil, want a rejection of the unsigned token")
 	}
 }
 
 func TestVerifyRejectsWrongSecret(t *testing.T) {
-	claims := Claims{Sub: "42", Role: "user", Typ: "access", Exp: time.Now().Add(time.Minute).Unix()}
+	claims := Claims{
+		Role: "user",
+		Typ:  "access",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "42",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
+	}
 
 	tok, err := Generate([]byte("secret-a"), claims)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
 
-	if _, err := Verify([]byte("secret-b"), tok, "access"); !errors.Is(err, ErrInvalidSignature) {
-		t.Fatalf("Verify() error = %v, want ErrInvalidSignature", err)
+	if _, err := Verify([]byte("secret-b"), tok, "access"); !errors.Is(err, jwt.ErrTokenSignatureInvalid) {
+		t.Fatalf("Verify() error = %v, want jwt.ErrTokenSignatureInvalid", err)
 	}
 }
 
 func TestVerifyRejectsMalformedToken(t *testing.T) {
-	if _, err := Verify([]byte("secret"), "not-a-jwt", "access"); !errors.Is(err, ErrMalformedToken) {
-		t.Fatalf("Verify() error = %v, want ErrMalformedToken", err)
+	if _, err := Verify([]byte("secret"), "not-a-jwt", "access"); !errors.Is(err, jwt.ErrTokenMalformed) {
+		t.Fatalf("Verify() error = %v, want jwt.ErrTokenMalformed", err)
 	}
 }
 
@@ -138,8 +183,8 @@ func TestGenerateAccessAndRefreshTokenHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Verify(access) error = %v", err)
 	}
-	if accessClaims.Sub != "7" || accessClaims.Role != "admin" {
-		t.Fatalf("access claims = %+v, want sub=7 role=admin", accessClaims)
+	if accessClaims.Subject != "7" || accessClaims.Role != "admin" {
+		t.Fatalf("access claims = %+v, want subject=7 role=admin", accessClaims)
 	}
 
 	refreshTok, jti, err := GenerateRefreshToken(refreshSecret, "7", "admin", time.Hour)
@@ -153,8 +198,8 @@ func TestGenerateAccessAndRefreshTokenHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Verify(refresh) error = %v", err)
 	}
-	if refreshClaims.Jti != jti {
-		t.Fatalf("refresh claims.Jti = %q, want %q", refreshClaims.Jti, jti)
+	if refreshClaims.ID != jti {
+		t.Fatalf("refresh claims.ID = %q, want %q", refreshClaims.ID, jti)
 	}
 }
 

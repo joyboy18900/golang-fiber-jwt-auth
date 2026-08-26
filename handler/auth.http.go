@@ -84,7 +84,7 @@ func (h authHandler) Me(c *fiber.Ctx) error {
 		return handleError(c, errs.NewUnauthorizedError("missing auth context"))
 	}
 
-	id, err := strconv.ParseInt(claims.Sub, 10, 64)
+	id, err := strconv.ParseInt(claims.Subject, 10, 64)
 	if err != nil {
 		return handleError(c, errs.NewUnexpectedError())
 	}

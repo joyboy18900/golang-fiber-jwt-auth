@@ -120,7 +120,7 @@ func (s authService) Refresh(ctx context.Context, req RefreshRequest) (*RefreshR
 		return nil, errs.NewUnauthorizedError("invalid refresh token")
 	}
 
-	userID, err := s.refreshRepo.Get(ctx, claims.Jti)
+	userID, err := s.refreshRepo.Get(ctx, claims.ID)
 	if errors.Is(err, repository.ErrRefreshTokenNotFound) {
 		return nil, errs.NewUnauthorizedError("refresh token revoked or expired")
 	}
@@ -153,7 +153,7 @@ func (s authService) Logout(ctx context.Context, req LogoutRequest) error {
 		return errs.NewUnauthorizedError("invalid refresh token")
 	}
 
-	if err := s.refreshRepo.Revoke(ctx, claims.Jti); err != nil {
+	if err := s.refreshRepo.Revoke(ctx, claims.ID); err != nil {
 		logs.Error(err)
 		return errs.NewUnexpectedError()
 	}
