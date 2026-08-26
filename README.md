@@ -30,6 +30,9 @@ See `curl/flow.md` for full request/response examples.
 - Access TTL 15m, refresh TTL 7d. Refresh token's `jti` lives in Redis;
   revoke = delete that key. Logout takes the refresh token, not the
   access token.
+- Reusing a refresh token after logout is rejected (401) - the `jti` is
+  gone from Redis, so replay fails the same check a legitimate expiry
+  would. See `auth_integration_test.go` for the full flow.
 - `token/` sits outside the ports/adapters split - a thin wrapper around
   the JWT library, no swappable backend.
 
