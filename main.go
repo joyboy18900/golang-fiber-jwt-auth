@@ -13,17 +13,16 @@ import (
 	"golang-fiber-jwt-auth/service"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func main() {
 	initConfig()
 
 	db := initPostgres()
-	defer db.Close()
 
 	redisClient := initRedis()
 	defer redisClient.Close()
@@ -67,7 +66,7 @@ func initConfig() {
 	}
 }
 
-func initPostgres() *sqlx.DB {
+func initPostgres() *gorm.DB {
 	dsn := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		viper.GetString("db.host"),
@@ -78,12 +77,9 @@ func initPostgres() *sqlx.DB {
 		viper.GetString("db.sslmode"),
 	)
 
-	db, err := sqlx.Open("postgres", dsn)
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		panic(fmt.Errorf("open postgres: %w", err))
-	}
-	if err := db.Ping(); err != nil {
-		panic(fmt.Errorf("ping postgres: %w", err))
 	}
 
 	return db
