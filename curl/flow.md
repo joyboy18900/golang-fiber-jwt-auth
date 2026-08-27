@@ -35,7 +35,7 @@ curl -X POST http://localhost:8080/auth/login \
 { "code": 200, "message": "login successful", "data": { "access_token": "...", "refresh_token": "..." } }
 ```
 
-Save both tokens from `data` - the rest of the flow needs them.
+Save both tokens from `data`. The rest of the flow needs them.
 
 ## 3. Call a protected route
 
